@@ -86,3 +86,80 @@ class IELM(ELM):
         pred = self.predict(x_train)
         acc = self.performance(y_train, pred)
         return pred, acc
+    
+class OSELM:
+    def __init__(self, hidden_nodes, activation):
+        self.features = None
+        self.hidden_nodes = hidden_nodes
+        self.activation = activation
+ 
+        self.input_weights = None
+        self.feedback = None # p
+        self.output_weights = None  # beta
+        self.bias = None
+ 
+ 
+    def hidden_layer(self, x):
+        bias = np.array([self.bias,]* x.shape[0])
+        
+        h = np.dot(x, self.input_weights) + bias
+        
+        if self.activation == 'relu':
+            h = np.maximum(h, 0, h)
+        elif self.activation == 'sigmoid':
+            h = 1 / (1 + np.exp(-h))
+        elif self.activation == 'sine':
+            h = np.sin(h)
+        elif self.activation == 'swish':
+            sigmoid = 1/(1 + np.exp(-h)) 
+            h = h * sigmoid
+        elif self.activation == 'leakyrelu':
+            h = np.where(h > 0, h, h * 0.01)
+        elif self.activation == 'tanh':
+            h = np.tanh(h)
+        return h
+ 
+    def fit(self, x_train, y_train):
+        samples = x_train.shape[0]
+        self.features = x_train.shape[1]
+        
+        if self.input_weights is None:
+            self.input_weights = np.random.normal(size=(self.features, self.hidden_nodes))
+            self.bias = np.random.random((1, self.hidden_nodes))[0]
+        
+        h = self.hidden_layer(x_train)
+        
+        if self.output_weights is None:
+            self.feedback = np.linalg.pinv(np.dot(h.T, h))
+            self.output_weights = self.feedback.dot(h.T).dot(y_train)
+        else:
+            part1 = self.feedback.dot(h.T)
+            part2 = np.identity(samples) + h.dot(self.feedback).dot(h.T)
+            part2 = np.linalg.pinv(part2)
+            part3 = h.dot(self.feedback)
+            self.feedback -= part1.dot(part2.dot(part3))
+            
+            
+            p1 = self.feedback.dot(h.T)
+            p2 = y_train - h.dot(self.output_weights)
+            self.output_weights += p1.dot(p2)
+        
+    def predict(self, x):
+        H = self.hidden_layer(x)
+        predictions = np.dot(H, self.output_weights)
+        return predictions
+ 
+    def evaluate(self, x_test, y_test):
+        pred = self.predict(x_test)
+        acc = self.performance(y_test, pred)
+        return pred, acc
+ 
+    def performance(self, y_actual, y_predicted):
+       
+        y_actual = np.argmax(y_actual, axis=-1)
+        y_predicted = np.argmax(y_predicted, axis=-1)
+        
+        correct = np.sum(y_actual == y_predicted)
+        accuracy = (correct / y_actual.shape[0]) * 100
+#         accuracy = format(accuracy, '.2f')
+        return accuracy
